@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
@@ -41,21 +43,88 @@ namespace SolidWorksApi
         }
 
         /// <summary>
-        /// Создаёт новый документ детали из шаблона по умолчанию.
+        /// Создаёт новый документ детали. Сначала пытается взять шаблон из настроек
+        /// SolidWorks; если пусто или не найдено — сканирует стандартные папки.
         /// </summary>
         public IModelDoc2 NewPart()
         {
             if (SwApp == null) Connect();
 
+            var attempts = new List<string>();
+
             string template = SwApp.GetUserPreferenceStringValue(
                 (int)swUserPreferenceStringValue_e.swDefaultTemplatePart);
+            if (!string.IsNullOrEmpty(template))
+            {
+                attempts.Add(template);
+                ModelDoc = TryCreate(template);
+                if (ModelDoc != null) return ModelDoc;
+            }
 
-            ModelDoc = (IModelDoc2)SwApp.NewDocument(template, 0, 0, 0);
-            if (ModelDoc == null)
-                throw new InvalidOperationException(
-                    "Не удалось создать новую деталь — проверьте шаблоны SolidWorks.");
+            foreach (string candidate in EnumerateFallbackTemplates())
+            {
+                attempts.Add(candidate);
+                ModelDoc = TryCreate(candidate);
+                if (ModelDoc != null) return ModelDoc;
+            }
 
-            return ModelDoc;
+            throw new InvalidOperationException(
+                "Не удалось создать новую деталь. Пробовал шаблоны:\n  " +
+                string.Join("\n  ", attempts.Count == 0
+                    ? new[] { "(шаблон по умолчанию не задан)" }
+                    : attempts.ToArray()) +
+                "\nПроверьте: Сервис → Параметры → Свойства файлов → Расположение файлов → Шаблоны документов.");
+        }
+
+        private IModelDoc2 TryCreate(string templatePath)
+        {
+            if (string.IsNullOrEmpty(templatePath) || !File.Exists(templatePath))
+                return null;
+            return SwApp.NewDocument(templatePath, 0, 0, 0) as IModelDoc2;
+        }
+
+        /// <summary>
+        /// Перебирает стандартные расположения шаблонов SolidWorks и возвращает пути
+        /// к Part.prtdot / Деталь.prtdot, если таковые найдены.
+        /// </summary>
+        private static IEnumerable<string> EnumerateFallbackTemplates()
+        {
+            string[] roots =
+            {
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            };
+            string[] templateNames =
+            {
+                "Part.prtdot", "Деталь.prtdot", "part.prtdot",
+            };
+
+            foreach (string root in roots)
+            {
+                if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) continue;
+                IEnumerable<string> hits;
+                try
+                {
+                    hits = Directory.EnumerateFiles(
+                        root, "*.prtdot", SearchOption.AllDirectories);
+                }
+                catch { continue; }
+
+                foreach (string file in hits)
+                {
+                    string name = Path.GetFileName(file);
+                    foreach (string wanted in templateNames)
+                    {
+                        if (string.Equals(name, wanted, StringComparison.OrdinalIgnoreCase))
+                        {
+                            yield return file;
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         /// <summary>
