@@ -78,6 +78,19 @@ namespace SolidWorksApi
 
         public void ClearSelection() => ModelDoc.ClearSelection2(true);
 
+        /// <summary>
+        /// Выделяет все эскизные элементы и удаляет их ("Очистить"). Изолирует
+        /// от UI работу с константами SolidWorks.
+        /// </summary>
+        public void ClearSketch()
+        {
+            if (ModelDoc == null) return;
+            ModelDoc.ClearSelection2(true);
+            ModelDoc.Extension.SelectAll();
+            ModelDoc.Extension.DeleteSelection2(
+                (int)swDeleteSelectionOptions_e.swDelete_Absorbed);
+        }
+
         public void Rebuild()
         {
             ModelDoc.EditRebuild3();

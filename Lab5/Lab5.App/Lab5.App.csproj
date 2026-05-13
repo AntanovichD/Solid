@@ -9,10 +9,31 @@
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <SolidWorksApiPath Condition="'$(SolidWorksApiPath)' == ''">C:\Program Files\SOLIDWORKS Corp\SOLIDWORKS\api\redist</SolidWorksApiPath>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\SolidWorksApi\SolidWorksApi.csproj" />
+  </ItemGroup>
+
+  <!-- Дублируем ссылки на SolidWorks Interop: в SDK-style csproj обычные <Reference>
+       не пробрасываются транзитивно, поэтому их нужно указать и в приложении. -->
+  <ItemGroup>
+    <Reference Include="SolidWorks.Interop.sldworks">
+      <HintPath>$(SolidWorksApiPath)\SolidWorks.Interop.sldworks.dll</HintPath>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="SolidWorks.Interop.swconst">
+      <HintPath>$(SolidWorksApiPath)\SolidWorks.Interop.swconst.dll</HintPath>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="SolidWorks.Interop.swcommands">
+      <HintPath>$(SolidWorksApiPath)\SolidWorks.Interop.swcommands.dll</HintPath>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>

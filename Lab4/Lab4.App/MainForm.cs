@@ -94,12 +94,7 @@ namespace Lab4.App
         {
             try
             {
-                if (_host.ModelDoc == null) return;
-                _host.ModelDoc.ClearSelection2(true);
-                _host.ModelDoc.Extension.SelectAll();
-                _host.ModelDoc.Extension.DeleteSelection2(
-                    (int)SolidWorks.Interop.swconst.swDeleteSelectionOptions_e
-                        .swDelete_Absorbed);
+                _host.ClearSketch();
                 lblStatus.Text = "Эскиз очищен.";
             }
             catch (Exception ex)
