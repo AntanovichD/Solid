@@ -1,0 +1,26 @@
+## Visual Studio
+.vs/
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+*.vscache
+*.cache
+*.ide
+*.lock.json
+project.lock.json
+TestResults/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+## NuGet
+packages/
+*.nupkg
+*.snupkg
+
+## OS
+.DS_Store
+Thumbs.db

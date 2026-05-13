@@ -1,0 +1,46 @@
+name: build
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        lab: [Lab4, Lab5]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build SolidWorks Interop stubs
+        shell: pwsh
+        run: |
+          $stubsDir = "$env:GITHUB_WORKSPACE\.stubs"
+          New-Item -ItemType Directory -Path $stubsDir -Force | Out-Null
+          # Берём csc.exe из MSBuild (поставляется со всеми runners ubuntu-latest / windows-latest)
+          $csc = (Get-ChildItem `
+              "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\Roslyn\csc.exe", `
+              "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\Roslyn\csc.exe", `
+              "${env:ProgramFiles}\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\Roslyn\csc.exe", `
+              "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\Roslyn\csc.exe" `
+              -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+          if (-not $csc) { throw "csc.exe не найден среди стандартных установок Visual Studio." }
+          Write-Host "csc = $csc"
+          $src = "$env:GITHUB_WORKSPACE\.github\workflows\sw_stubs.cs"
+          & $csc /target:library /out:"$stubsDir\SolidWorks.Interop.sldworks.dll" /define:SLDWORKS $src
+          & $csc /target:library /out:"$stubsDir\SolidWorks.Interop.swconst.dll" /define:SWCONST $src
+          & $csc /target:library /out:"$stubsDir\SolidWorks.Interop.swcommands.dll" /define:SWCOMMANDS $src
+          Get-ChildItem $stubsDir
+
+      - name: Restore
+        run: msbuild "${{ matrix.lab }}\${{ matrix.lab }}.sln" /t:Restore /p:SolidWorksApiPath="${{ github.workspace }}\.stubs"
+
+      - name: Build
+        run: msbuild "${{ matrix.lab }}\${{ matrix.lab }}.sln" /p:Configuration=Debug /p:SolidWorksApiPath="${{ github.workspace }}\.stubs"
