@@ -84,8 +84,9 @@ namespace SolidWorksApi
         }
 
         /// <summary>
-        /// Перебирает стандартные расположения шаблонов SolidWorks и возвращает пути
-        /// к Part.prtdot / Деталь.prtdot, если таковые найдены.
+        /// Перебирает стандартные расположения шаблонов SolidWorks. Сначала возвращает
+        /// явные "Part.prtdot"/"Деталь.prtdot", затем — любые *.prtdot (например
+        /// gost-part.prtdot на локализованных сборках).
         /// </summary>
         private static IEnumerable<string> EnumerateFallbackTemplates()
         {
@@ -96,34 +97,45 @@ namespace SolidWorksApi
                 Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
                 Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
             };
-            string[] templateNames =
+            string[] preferred =
             {
                 "Part.prtdot", "Деталь.prtdot", "part.prtdot",
             };
 
+            var all = new List<string>();
             foreach (string root in roots)
             {
                 if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) continue;
-                IEnumerable<string> hits;
                 try
                 {
-                    hits = Directory.EnumerateFiles(
-                        root, "*.prtdot", SearchOption.AllDirectories);
+                    all.AddRange(Directory.EnumerateFiles(
+                        root, "*.prtdot", SearchOption.AllDirectories));
                 }
-                catch { continue; }
+                catch { /* пропускаем недоступные папки */ }
+            }
 
-                foreach (string file in hits)
+            // сначала явные имена — быстрее срабатывают на стандартных установках
+            foreach (string file in all)
+            {
+                string name = Path.GetFileName(file);
+                foreach (string wanted in preferred)
                 {
-                    string name = Path.GetFileName(file);
-                    foreach (string wanted in templateNames)
+                    if (string.Equals(name, wanted, StringComparison.OrdinalIgnoreCase))
                     {
-                        if (string.Equals(name, wanted, StringComparison.OrdinalIgnoreCase))
-                        {
-                            yield return file;
-                            break;
-                        }
+                        yield return file;
+                        break;
                     }
                 }
+            }
+            // затем — любой прочий .prtdot (gost-part, custom, ит.п.)
+            foreach (string file in all)
+            {
+                string name = Path.GetFileName(file);
+                bool isPreferred = false;
+                foreach (string wanted in preferred)
+                    if (string.Equals(name, wanted, StringComparison.OrdinalIgnoreCase))
+                    { isPreferred = true; break; }
+                if (!isPreferred) yield return file;
             }
         }
 
